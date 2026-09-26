@@ -1,8 +1,0 @@
-type;name;phone;email;organization;position;internalNumber
-contact;Анна Смирнова;+7-900-111-22-33;anna.smirnova@example.com;ООО Ромашка;;
-corporate;Антон Смирнов;+7-495-123-45-67;a.smirnov@vector.ru;АО Вектор;Менеджер;101
-emergency;Иван Смирнов (SOS);+7-900-000-00-01;sos.smirnov@example.com;—;;
-contact;Андрей Соколов;+7-900-444-55-66;andrey.sokolov@example.com;АО Вектор;;
-contact;Анжелика Ким;+7-900-777-88-99;anzhelika.kim@example.com;ООО Ромашка;;
-contact;Битая строка
-contact;;+7-900-000-00-00;no-name@example.com;ООО Тест;;
