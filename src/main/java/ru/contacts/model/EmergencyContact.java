@@ -1,9 +1,14 @@
 package ru.contacts.model;
 
 /**
- * Аварийный контакт — read-only тип.
- * НЕ реализует Editable, сеттеров нет: редактирование запрещено.
- * Объекты этого типа появляются только при загрузке из файла.
+ * Аварийный контакт — read-only тип варианта 4.
+ *
+ * <p>НЕ реализует {@link Editable}, сеттеров нет: редактирование запрещено.
+ * Объекты этого типа появляются только при загрузке из файла, в GUI их создать нельзя.
+ *
+ * <p>Класс намеренно не имеет собственных полей: он помечает объект как read-only,
+ * и отдельные сеттеры с {@code UnsupportedOperationException} не нужны — базовый
+ * {@link Contact} неизменяемый.
  */
 public class EmergencyContact extends Contact {
 
@@ -12,22 +17,7 @@ public class EmergencyContact extends Contact {
     }
 
     @Override
-    public void setName(String name) {
-        throw new UnsupportedOperationException("Аварийный контакт доступен только для чтения");
-    }
-
-    @Override
-    public void setPhone(String phone) {
-        throw new UnsupportedOperationException("Аварийный контакт доступен только для чтения");
-    }
-
-    @Override
-    public void setEmail(String email) {
-        throw new UnsupportedOperationException("Аварийный контакт доступен только для чтения");
-    }
-
-    @Override
-    public void setOrganization(String organization) {
-        throw new UnsupportedOperationException("Аварийный контакт доступен только для чтения");
+    public ContactType type() {
+        return ContactType.EMERGENCY;
     }
 }

@@ -5,6 +5,8 @@ package ru.contacts.io;
  * Каждая битая строка классифицируется одним кодом и показывается в GUI.
  */
 public enum CsvErrorCode {
+    /** Первая строка файла не совпадает с ожидаемым заголовком. */
+    BAD_HEADER,
     /** Неверное число полей (ожидается 7). */
     WRONG_FIELD_COUNT,
     /** Неизвестное значение колонки type (ожидается CONTACT, EMERGENCY или CORPORATE). */

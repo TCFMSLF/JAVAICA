@@ -1,7 +1,0 @@
-type;name;phone;email;organization;position;internalNumber
-CONTACT;Иван Петров;+7-900-111-22-33;ivan@example.com;ООО Ромашка;;
-EMERGENCY;Мама;+7-900-000-00-01;mama@example.com;;;
-CORPORATE;Анна Сидорова;+7-900-222-33-44;anna@corp.ru;ООО Ромашка;Менеджер;1234
-CONTACT;Петр Смирнов;+7-900-333-44-55;petr@example.com;ИП Смирнов;;
-БИТАЯ СТРОКА БЕЗ РАЗДЕЛИТЕЛЕЙ
-CORPORATE;Без должности;+7-900-444-55-66;noduty@corp.ru;ООО Ромашка;;

@@ -2,7 +2,9 @@ package ru.contacts.ui;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -32,9 +34,12 @@ import ru.contacts.model.Editable;
 /**
  * Главное окно справочника контактов (Лаб. 1, вариант 4).
  * Таблица + кнопки «Загрузить CSV», «Сохранить CSV», «Добавить», «Изменить».
- * Кнопка «Изменить» активна только для Editable-типов.
+ * Кнопка «Изменить» активна только для Editable-типов, то есть только для корпоративных
+ * контактов: базовый и аварийный появляются исключительно при загрузке из файла.
  */
 public class ContactApp extends Application {
+
+    private static final String CSV_EXTENSION = ".csv";
 
     private final ObservableList<Contact> contacts = FXCollections.observableArrayList();
     private TableView<Contact> table;
@@ -79,13 +84,7 @@ public class ContactApp extends Application {
     private static TableColumn<Contact, String> typeColumn() {
         TableColumn<Contact, String> col = new TableColumn<>("Тип");
         col.setPrefWidth(110);
-        col.setCellValueFactory(data -> {
-            Contact c = data.getValue();
-            if (c instanceof CorporateContact) {
-                return new ReadOnlyStringWrapper("CORPORATE");
-            }
-            return new ReadOnlyStringWrapper(c.getClass().getSimpleName().toUpperCase());
-        });
+        col.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().type().tag()));
         return col;
     }
 
@@ -100,7 +99,9 @@ public class ContactApp extends Application {
     private FileChooser csvChooser(String title) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(title);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
+        chooser.setInitialFileName("contacts" + CSV_EXTENSION);
+        chooser.getExtensionFilters()
+                .add(new FileChooser.ExtensionFilter("CSV", "*" + CSV_EXTENSION));
         return chooser;
     }
 
@@ -126,8 +127,15 @@ public class ContactApp extends Application {
             return;
         }
         Path path = file.toPath();
-        if (!path.toString().toLowerCase().endsWith(".csv")) {
-            path = path.resolveSibling(path.getFileName() + ".csv");
+        if (!path.getFileName().toString().toLowerCase().endsWith(CSV_EXTENSION)) {
+            Path renamed = path.resolveSibling(path.getFileName() + CSV_EXTENSION);
+            try {
+                Files.move(path, renamed, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException ex) {
+                showError("Ошибка сохранения", ex.getMessage());
+                return;
+            }
+            path = renamed;
         }
         try {
             CsvLoader.save(new ArrayList<>(contacts), path);
@@ -143,11 +151,13 @@ public class ContactApp extends Application {
 
     private void onEdit() {
         Contact selected = table.getSelectionModel().getSelectedItem();
-        if (!(selected instanceof Editable)) {
-            return;
+        // Проверка на Editable уже сделана при включении кнопки «Изменить».
+        // Изменяемый тип варианта 4 один — CorporateContact, он же единственный,
+        // кто реализует Editable, поэтому здесь достаточно с образцом типа.
+        if (selected instanceof CorporateContact corporate) {
+            Optional<Contact> updated = new ContactDialog(corporate).showAndWait();
+            updated.ifPresent(c -> contacts.set(contacts.indexOf(selected), c));
         }
-        Optional<Contact> updated = new ContactDialog(selected).showAndWait();
-        updated.ifPresent(c -> contacts.set(contacts.indexOf(selected), c));
     }
 
     private void showSkippedDialog(CsvLoadResult result) {
@@ -165,7 +175,7 @@ public class ContactApp extends Application {
     private void showError(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
-        alert.setHeaderText(title);
+        alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
     }

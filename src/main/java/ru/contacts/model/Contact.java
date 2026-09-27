@@ -2,16 +2,24 @@ package ru.contacts.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 
 /**
  * Основная сущность варианта 4: контакт справочника.
+ *
+ * <p>Класс неизменяемый: поля {@code private final}, сеттеров нет. Правка выполняется
+ * созданием нового объекта, поэтому read-only подтип {@link EmergencyContact} не может
+ * быть изменён в обход контракта.
+ *
+ * <p>Базовая сущность намеренно НЕ реализует {@link Editable}: по условию задачи редактируемым
+ * является только корпоративный контакт.
  */
+public class Contact {
 
-public class Contact implements Editable {
-    protected String name;
-    protected String phone;
-    protected String email;
-    protected String organization;
+    private final String name;
+    private final String phone;
+    private final String email;
+    private final String organization;
 
     public Contact(String name, String phone, String email, String organization) {
         this.name = name;
@@ -24,45 +32,54 @@ public class Contact implements Editable {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public String getPhone() {
         return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
     }
 
     public String getEmail() {
         return email;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
     public String getOrganization() {
         return organization;
     }
 
-    public void setOrganization(String organization) {
-        this.organization = organization;
+    /**
+     * @return тип контакта для отображения и записи в файл
+     */
+    public ContactType type() {
+        return ContactType.CONTACT;
+    }
+
+    /**
+     * Собирает строковое представление: имя класса, поля базового типа и дополнительные поля.
+     * Реализовано один раз здесь, чтобы наследники не дублировали форматирование.
+     *
+     * @param extraFields дополнительные поля в виде {@code "поле='значение'"}
+     */
+    protected String describe(String... extraFields) {
+        StringJoiner joiner = new StringJoiner(", ", getClass().getSimpleName() + "{", "}");
+        joiner.add("name='" + name + '\'');
+        joiner.add("phone='" + phone + '\'');
+        joiner.add("email='" + email + '\'');
+        joiner.add("organization='" + organization + '\'');
+        for (String field : extraFields) {
+            joiner.add(field);
+        }
+        return joiner.toString();
     }
 
     @Override
     public String toString() {
-        return getClass().getSimpleName()
-                + "{name='" + name + '\''
-                + ", phone='" + phone + '\''
-                + ", email='" + email + '\''
-                + ", organization='" + organization + '\''
-                + '}';
+        return describe();
     }
 
-    @Override
+    /**
+     * Проверка полей контакта. Есть у всех типов, чтобы правила не зависели от JavaFX.
+     * Для {@link CorporateContact} переопределяется и дополняется проверкой должности.
+     *
+     * @return список ошибок; пустой список = данные корректны
+     */
     public List<String> validate() {
         List<String> errors = new ArrayList<>();
         if (name == null || name.isBlank()) {

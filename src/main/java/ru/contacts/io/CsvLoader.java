@@ -6,9 +6,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import ru.contacts.model.Contact;
+import ru.contacts.model.ContactType;
 import ru.contacts.model.CorporateContact;
 import ru.contacts.model.EmergencyContact;
 
@@ -17,13 +20,26 @@ import ru.contacts.model.EmergencyContact;
  * Битые строки при загрузке пропускаются, каждая фиксируется
  * в {@link CsvLoadResult} с номером строки и кодом {@link CsvErrorCode}.
  *
- * Формат: type;name;phone;email;organization;position;internalNumber
+ * <p>Формат: type;name;phone;email;organization;position;internalNumber
  * type = CONTACT | EMERGENCY | CORPORATE
+ *
+ * <p>Файл сохраняется в UTF-8 <b>с BOM</b> и с переводом строки {@code \n} независимо от ОС:
+ * без BOM кириллица в Excel открывается как кракозябры, а платформенный разделитель строк
+ * делает файл непереносимым между Windows и Linux.
+ *
+ * <p>Экранирование значений не поддерживается: разделитель {@code ';'} в имени или телефоне
+ * приведёт к {@link CsvErrorCode#WRONG_FIELD_COUNT} при чтении. Для форматов с экранированием
+ * в лабораторной № 3 используется Jackson.
  */
 public final class CsvLoader {
 
-    private static final String HEADER = "type;name;phone;email;organization;position;internalNumber";
+    private static final String DELIMITER = ";";
+    private static final String HEADER =
+            String.join(DELIMITER, "type", "name", "phone", "email",
+                    "organization", "position", "internalNumber");
     private static final int FIELD_COUNT = 7;
+    private static final String BOM = "\uFEFF";
+    private static final String NEW_LINE = "\n";
 
     private CsvLoader() {
     }
@@ -32,12 +48,21 @@ public final class CsvLoader {
         List<Contact> contacts = new ArrayList<>();
         List<CsvRowError> errors = new ArrayList<>();
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        for (int i = 0; i < lines.size(); i++) {
+
+        if (lines.isEmpty()) {
+            errors.add(new CsvRowError(1, CsvErrorCode.BAD_HEADER,
+                    "файл пуст, ожидалась строка заголовка: " + HEADER));
+            return new CsvLoadResult(contacts, errors);
+        }
+
+        if (!stripBom(lines.get(0)).trim().equals(HEADER)) {
+            errors.add(new CsvRowError(1, CsvErrorCode.BAD_HEADER,
+                    "ожидался заголовок: " + HEADER));
+        }
+
+        for (int i = 1; i < lines.size(); i++) {
             int lineNumber = i + 1;
             String line = lines.get(i);
-            if (i == 0) {
-                continue; // строка-заголовок
-            }
             if (line.isBlank()) {
                 continue;
             }
@@ -57,12 +82,12 @@ public final class CsvLoader {
      * @return контакт либо ошибку с кодом, если строка битая
      */
     static ParseOutcome parseLine(String line, int lineNumber) {
-        String[] parts = line.split(";", -1);
+        String[] parts = line.split(DELIMITER, -1);
         if (parts.length != FIELD_COUNT) {
             return ParseOutcome.failure(lineNumber, CsvErrorCode.WRONG_FIELD_COUNT,
                     "ожидалось полей: " + FIELD_COUNT + ", найдено: " + parts.length);
         }
-        String type = parts[0].trim();
+        String tag = parts[0].trim();
         String name = parts[1].trim();
         String phone = parts[2].trim();
         String email = parts[3].trim();
@@ -70,55 +95,63 @@ public final class CsvLoader {
         String position = parts[5].trim();
         String internalNumber = parts[6].trim();
 
+        Optional<ContactType> type = ContactType.fromTag(tag);
+        if (type.isEmpty()) {
+            return ParseOutcome.failure(lineNumber, CsvErrorCode.UNKNOWN_TYPE,
+                    "неизвестный тип: '" + tag + "'; ожидается один из: "
+                            + Arrays.toString(ContactType.values()));
+        }
+
         if (name.isEmpty() || phone.isEmpty() || email.isEmpty()) {
             return ParseOutcome.failure(lineNumber, CsvErrorCode.EMPTY_REQUIRED_FIELD,
                     "имя, телефон и e-mail обязательны");
         }
 
-        switch (type) {
-            case "CONTACT":
-                return ParseOutcome.success(new Contact(name, phone, email, organization));
-            case "EMERGENCY":
-                return ParseOutcome.success(new EmergencyContact(name, phone, email, organization));
-            case "CORPORATE":
-                if (position.isEmpty()) {
-                    return ParseOutcome.failure(lineNumber, CsvErrorCode.EMPTY_POSITION,
-                            "у корпоративного контакта обязательна должность");
-                }
-                return ParseOutcome.success(
-                        new CorporateContact(name, phone, email, organization, position, internalNumber));
-            default:
-                return ParseOutcome.failure(lineNumber, CsvErrorCode.UNKNOWN_TYPE,
-                        "неизвестный тип: '" + type + "'");
+        if (type.get() == ContactType.CORPORATE) {
+            if (position.isEmpty()) {
+                return ParseOutcome.failure(lineNumber, CsvErrorCode.EMPTY_POSITION,
+                        "у корпоративного контакта обязательна должность");
+            }
+            return ParseOutcome.success(
+                    new CorporateContact(name, phone, email, organization, position, internalNumber));
         }
+
+        if (type.get() == ContactType.EMERGENCY) {
+            return ParseOutcome.success(new EmergencyContact(name, phone, email, organization));
+        }
+        return ParseOutcome.success(new Contact(name, phone, email, organization));
     }
 
     public static void save(List<Contact> contacts, Path file) throws IOException {
         try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            writer.write(BOM);
             writer.write(HEADER);
-            writer.newLine();
+            writer.write(NEW_LINE);
             for (Contact c : contacts) {
                 writer.write(toLine(c));
-                writer.newLine();
+                writer.write(NEW_LINE);
             }
         }
     }
 
     static String toLine(Contact c) {
-        if (c instanceof CorporateContact) {
-            CorporateContact cc = (CorporateContact) c;
-            return String.join(";",
-                    "CORPORATE", c.getName(), c.getPhone(), c.getEmail(),
-                    c.getOrganization(), cc.getPosition(), cc.getInternalNumber());
+        String position = "";
+        String internalNumber = "";
+        if (c instanceof CorporateContact corporate) {
+            position = orEmpty(corporate.getPosition());
+            internalNumber = orEmpty(corporate.getInternalNumber());
         }
-        if (c instanceof EmergencyContact) {
-            return String.join(";",
-                    "EMERGENCY", c.getName(), c.getPhone(), c.getEmail(),
-                    c.getOrganization(), "", "");
-        }
-        return String.join(";",
-                "CONTACT", c.getName(), c.getPhone(), c.getEmail(),
-                c.getOrganization(), "", "");
+        return String.join(DELIMITER,
+                ContactType.of(c).tag(), c.getName(), c.getPhone(), c.getEmail(),
+                c.getOrganization(), position, internalNumber);
+    }
+
+    private static String stripBom(String line) {
+        return line.startsWith(BOM) ? line.substring(BOM.length()) : line;
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     /** Внутренний итог разбора одной строки: либо контакт, либо ошибка. */

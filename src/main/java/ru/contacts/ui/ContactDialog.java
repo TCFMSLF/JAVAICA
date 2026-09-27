@@ -12,16 +12,19 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import ru.contacts.model.Contact;
+import ru.contacts.model.ContactType;
 import ru.contacts.model.CorporateContact;
-import ru.contacts.model.Editable;
-import ru.contacts.model.EmergencyContact;
 
 /**
- * Диалог добавления/редактирования контакта.
- * В режиме добавления тип выбирается; CONTACT и EMERGENCY заблокированы
- * для создания (появляются только из файла) — создать можно только
- * редактируемый CorporateContact. В режиме редактирования тип фиксирован.
- * Сохранение блокируется, пока {@link Editable#validate()} возвращает ошибки.
+ * Диалог добавления/редактирования корпоративного контакта.
+ *
+ * <p>По условию задачи создавать и редактировать через GUI можно только редактируемые типы,
+ * а read-only-типы (базовый и аварийный контакты) появляются исключительно при загрузке
+ * из файла. Единственный редактируемый тип варианта 4 — {@link CorporateContact}, поэтому
+ * диалог работает только с ним. Поле типа оставлено видимым и заблокированным: так видно,
+ * почему EmergencyContact нельзя создать вручную.
+ *
+ * <p>Сохранение блокируется, пока {@link Contact#validate()} возвращает ошибки.
  */
 public class ContactDialog extends Dialog<Contact> {
 
@@ -35,22 +38,20 @@ public class ContactDialog extends Dialog<Contact> {
     private final Label hintLabel = new Label();
 
     /**
-     * @param existing контакт для редактирования или null для добавления
+     * @param existing корпоративный контакт для редактирования или null для добавления
      */
-    public ContactDialog(Contact existing) {
+    public ContactDialog(CorporateContact existing) {
         boolean editMode = existing != null;
         setTitle(editMode ? "Изменить контакт" : "Добавить контакт");
 
         ButtonType saveType = new ButtonType("Сохранить", ButtonBar.ButtonData.OK_DONE);
         getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
-        typeBox.getItems().addAll("CONTACT", "EMERGENCY", "CORPORATE");
+        typeBox.getItems().add(ContactType.CORPORATE.tag());
+        typeBox.setValue(ContactType.CORPORATE.tag());
+        typeBox.setDisable(true);
         if (editMode) {
-            typeBox.setValue(typeOf(existing));
-            typeBox.setDisable(true);
             fillFields(existing);
-        } else {
-            typeBox.setValue("CORPORATE");
         }
 
         GridPane grid = new GridPane();
@@ -74,72 +75,34 @@ public class ContactDialog extends Dialog<Contact> {
         grid.add(hintLabel, 0, 7, 2, 1);
         getDialogPane().setContent(grid);
 
-        Runnable refresh = () -> {
-            boolean corporate = "CORPORATE".equals(typeBox.getValue());
-            boolean cont = "CONTACT".equals(typeBox.getValue());
-            positionField.setDisable(!corporate);
-            internalField.setDisable(!corporate);
-            if (!editMode && !(corporate || cont)){
-                hintLabel.setText("Тип " + typeBox.getValue()
-                        + " появляется только из файла. Выберите CORPORATE.");
-            } else {
-                hintLabel.setText("");
-            }
-            getDialogPane().lookupButton(saveType)
-                    .setDisable(!editMode && !(corporate || cont));
-        };
-        typeBox.setOnAction(e -> refresh.run());
-        refresh.run();
-
         // Валидация до закрытия: при ошибках диалог остаётся открытым.
         getDialogPane().lookupButton(saveType).addEventFilter(ActionEvent.ACTION, event -> {
-            Contact candidate = buildContact();
-            if (candidate instanceof Editable) {
-                List<String> errors = ((Editable) candidate).validate();
-                if (!errors.isEmpty()) {
-                    hintLabel.setText(String.join("; ", errors));
-                    event.consume();
-                }
+            List<String> errors = buildContact().validate();
+            if (!errors.isEmpty()) {
+                hintLabel.setText(String.join("; ", errors));
+                event.consume();
             }
         });
 
         setResultConverter(button -> button == saveType ? buildContact() : null);
     }
 
-    private void fillFields(Contact c) {
+    private void fillFields(CorporateContact c) {
         nameField.setText(c.getName());
         phoneField.setText(c.getPhone());
         emailField.setText(c.getEmail());
         orgField.setText(c.getOrganization());
-        if (c instanceof CorporateContact) {
-            positionField.setText(((CorporateContact) c).getPosition());
-            internalField.setText(((CorporateContact) c).getInternalNumber());
-        }
+        positionField.setText(c.getPosition());
+        internalField.setText(c.getInternalNumber());
     }
 
     private Contact buildContact() {
-        String name = nameField.getText().trim();
-        String phone = phoneField.getText().trim();
-        String email = emailField.getText().trim();
-        String org = orgField.getText().trim();
-        switch (typeBox.getValue()) {
-            case "EMERGENCY":
-                return new EmergencyContact(name, phone, email, org);
-            case "CORPORATE":
-                return new CorporateContact(name, phone, email, org,
-                        positionField.getText().trim(), internalField.getText().trim());
-            default:
-                return new Contact(name, phone, email, org);
-        }
-    }
-
-    private static String typeOf(Contact c) {
-        if (c instanceof CorporateContact) {
-            return "CORPORATE";
-        }
-        if (c instanceof EmergencyContact) {
-            return "EMERGENCY";
-        }
-        return "CONTACT";
+        return new CorporateContact(
+                nameField.getText().trim(),
+                phoneField.getText().trim(),
+                emailField.getText().trim(),
+                orgField.getText().trim(),
+                positionField.getText().trim(),
+                internalField.getText().trim());
     }
 }

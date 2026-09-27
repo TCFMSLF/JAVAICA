@@ -1,6 +1,5 @@
 package ru.contacts.io;
 
-import java.util.Collections;
 import java.util.List;
 
 import ru.contacts.model.Contact;
@@ -14,8 +13,8 @@ public class CsvLoadResult {
     private final List<CsvRowError> errors;
 
     public CsvLoadResult(List<Contact> contacts, List<CsvRowError> errors) {
-        this.contacts = Collections.unmodifiableList(contacts);
-        this.errors = Collections.unmodifiableList(errors);
+        this.contacts = List.copyOf(contacts);
+        this.errors = List.copyOf(errors);
     }
 
     public List<Contact> getContacts() {
