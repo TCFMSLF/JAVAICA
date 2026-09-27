@@ -2,6 +2,7 @@ package ru.contacts.io;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,22 +16,18 @@ import ru.contacts.model.ContactType;
 import ru.contacts.model.CorporateContact;
 import ru.contacts.model.EmergencyContact;
 
-/**
- * Загрузка/сохранение контактов в CSV с разделителем ';'.
- * Битые строки при загрузке пропускаются, каждая фиксируется
- * в {@link CsvLoadResult} с номером строки и кодом {@link CsvErrorCode}.
- *
- * <p>Формат: type;name;phone;email;organization;position;internalNumber
- * type = CONTACT | EMERGENCY | CORPORATE
- *
- * <p>Файл сохраняется в UTF-8 <b>с BOM</b> и с переводом строки {@code \n} независимо от ОС:
- * без BOM кириллица в Excel открывается как кракозябры, а платформенный разделитель строк
- * делает файл непереносимым между Windows и Linux.
- *
- * <p>Экранирование значений не поддерживается: разделитель {@code ';'} в имени или телефоне
- * приведёт к {@link CsvErrorCode#WRONG_FIELD_COUNT} при чтении. Для форматов с экранированием
- * в лабораторной № 3 используется Jackson.
- */
+// Загрузка/сохранение контактов в CSV с разделителем ';'.
+//
+// Формат: type;name;phone;email;organization;position;internalNumber
+// type = CONTACT | EMERGENCY | CORPORATE
+//
+// Два разных механизма сообщения об ошибках, потому что ошибки разные:
+//   CsvRowError    — битая строка. Ожидаемый исход разбора: строка пропускается,
+//                    файл читается дальше, все ошибки собираются в список и
+//                    показываются в GUI одним диалогом.
+//   CsvLoadException — файл целиком непригоден. Возвращать нечего, поэтому
+//                    это исключение с кодом ошибки; GUI ловит его отдельно.
+
 public final class CsvLoader {
 
     private static final String DELIMITER = ";";
@@ -39,23 +36,45 @@ public final class CsvLoader {
                     "organization", "position", "internalNumber");
     private static final int FIELD_COUNT = 7;
     private static final String BOM = "\uFEFF";
+    // Задана явно, а не через writer.newLine(): newLine() пишет разделитель
+    // текущей ОС, и файл перестаёт открываться одинаково в Windows и Linux.
     private static final String NEW_LINE = "\n";
 
     private CsvLoader() {
     }
 
+    // Читает файл и разбирает его построчно.
+    //
+    // Битая строка не прерывает разбор: попадает в CsvLoadResult с кодом
+    // CsvErrorCode и пропускается. Если файл целиком непригоден — бросается
+    // CsvLoadException, возвращать в таком случае нечего.
     public static CsvLoadResult load(Path file) throws IOException {
+        // Проверяем заранее: на Windows Files.readAllLines на папке бросает IOException
+        // с невнятным «Is a directory».
+        if (Files.isDirectory(file)) {
+            throw new CsvLoadException(CsvErrorCode.NOT_A_FILE, "это папка, а не файл: " + file);
+        }
+
         List<Contact> contacts = new ArrayList<>();
         List<CsvRowError> errors = new ArrayList<>();
-        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        } catch (MalformedInputException ex) {
+            // Файл читается, но не в UTF-8: причина в данных, а не в доступе —
+            // сообщение стандартного исключения («Input length = 1») пользователю ничего не объясняет.
+            throw new CsvLoadException(CsvErrorCode.BAD_HEADER,
+                    "файл не в кодировке UTF-8: " + file, ex);
+        }
 
         if (lines.isEmpty()) {
-            errors.add(new CsvRowError(1, CsvErrorCode.BAD_HEADER,
-                    "файл пуст, ожидалась строка заголовка: " + HEADER));
-            return new CsvLoadResult(contacts, errors);
+            throw new CsvLoadException(CsvErrorCode.BAD_HEADER,
+                    "файл пуст, ожидалась строка заголовка: " + HEADER);
         }
 
         if (!stripBom(lines.get(0)).trim().equals(HEADER)) {
+            // Терпимо: неизвестная схема не мешает разобрать строки с ожидаемым
+            // числом полей, поэтому фиксируем ошибку и продолжаем чтение.
             errors.add(new CsvRowError(1, CsvErrorCode.BAD_HEADER,
                     "ожидался заголовок: " + HEADER));
         }
@@ -64,6 +83,7 @@ public final class CsvLoader {
             int lineNumber = i + 1;
             String line = lines.get(i);
             if (line.isBlank()) {
+                // Пустые строки пропускаем молча: это не ошибка данных.
                 continue;
             }
             ParseOutcome outcome = parseLine(line, lineNumber);
@@ -76,12 +96,9 @@ public final class CsvLoader {
         return new CsvLoadResult(contacts, errors);
     }
 
-    /**
-     * Разбирает одну строку CSV.
-     *
-     * @return контакт либо ошибку с кодом, если строка битая
-     */
     static ParseOutcome parseLine(String line, int lineNumber) {
+        // -1 обязателен: без него split отбрасывает хвостовые пустые поля, и строка
+        // "CONTACT;Иван;123;a@b;Org;;" даст 3 поля вместо 7 — ложный WRONG_FIELD_COUNT.
         String[] parts = line.split(DELIMITER, -1);
         if (parts.length != FIELD_COUNT) {
             return ParseOutcome.failure(lineNumber, CsvErrorCode.WRONG_FIELD_COUNT,
@@ -98,6 +115,8 @@ public final class CsvLoader {
         Optional<ContactType> type = ContactType.fromTag(tag);
         if (type.isEmpty()) {
             return ParseOutcome.failure(lineNumber, CsvErrorCode.UNKNOWN_TYPE,
+                    // Имя константы enum совпадает с тегом в CSV, поэтому
+                    // выводим список без преобразования.
                     "неизвестный тип: '" + tag + "'; ожидается один из: "
                             + Arrays.toString(ContactType.values()));
         }
@@ -154,7 +173,7 @@ public final class CsvLoader {
         return value == null ? "" : value;
     }
 
-    /** Внутренний итог разбора одной строки: либо контакт, либо ошибка. */
+    // Заполнено ровно одно: contact у success, error у failure.
     static final class ParseOutcome {
         private final Contact contact;
         private final CsvRowError error;

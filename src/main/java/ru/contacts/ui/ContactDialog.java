@@ -15,17 +15,13 @@ import ru.contacts.model.Contact;
 import ru.contacts.model.ContactType;
 import ru.contacts.model.CorporateContact;
 
-/**
- * Диалог добавления/редактирования корпоративного контакта.
- *
- * <p>По условию задачи создавать и редактировать через GUI можно только редактируемые типы,
- * а read-only-типы (базовый и аварийный контакты) появляются исключительно при загрузке
- * из файла. Единственный редактируемый тип варианта 4 — {@link CorporateContact}, поэтому
- * диалог работает только с ним. Поле типа оставлено видимым и заблокированным: так видно,
- * почему EmergencyContact нельзя создать вручную.
- *
- * <p>Сохранение блокируется, пока {@link Contact#validate()} возвращает ошибки.
- */
+// Диалог добавления/редактирования корпоративного контакта.
+//
+// Через GUI можно создавать и редактировать только редактируемые типы, а read-only
+// появляются исключительно при загрузке из файла. Единственный редактируемый тип
+// варианта 4 — CorporateContact, поэтому диалог работает только с ним.
+//
+// Сохранение блокируется, пока validate() возвращает ошибки.
 public class ContactDialog extends Dialog<Contact> {
 
     private final ComboBox<String> typeBox = new ComboBox<>();
@@ -37,9 +33,6 @@ public class ContactDialog extends Dialog<Contact> {
     private final TextField internalField = new TextField();
     private final Label hintLabel = new Label();
 
-    /**
-     * @param existing корпоративный контакт для редактирования или null для добавления
-     */
     public ContactDialog(CorporateContact existing) {
         boolean editMode = existing != null;
         setTitle(editMode ? "Изменить контакт" : "Добавить контакт");
@@ -47,6 +40,8 @@ public class ContactDialog extends Dialog<Contact> {
         ButtonType saveType = new ButtonType("Сохранить", ButtonBar.ButtonData.OK_DONE);
         getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
+        // Значение одно и выбор заблокирован: создавать можно только редактируемые типы,
+        // но ограничение лучше показать, чем скрыть.
         typeBox.getItems().add(ContactType.CORPORATE.tag());
         typeBox.setValue(ContactType.CORPORATE.tag());
         typeBox.setDisable(true);
@@ -76,6 +71,8 @@ public class ContactDialog extends Dialog<Contact> {
         getDialogPane().setContent(grid);
 
         // Валидация до закрытия: при ошибках диалог остаётся открытым.
+        // Именно consume, а не просто return: без отмены события диалог закроется
+        // с незаполненными полями.
         getDialogPane().lookupButton(saveType).addEventFilter(ActionEvent.ACTION, event -> {
             List<String> errors = buildContact().validate();
             if (!errors.isEmpty()) {

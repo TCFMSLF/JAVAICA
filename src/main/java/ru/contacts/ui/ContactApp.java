@@ -24,6 +24,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import ru.contacts.io.CsvLoadException;
 import ru.contacts.io.CsvLoadResult;
 import ru.contacts.io.CsvLoader;
 import ru.contacts.io.CsvRowError;
@@ -31,16 +32,16 @@ import ru.contacts.model.Contact;
 import ru.contacts.model.CorporateContact;
 import ru.contacts.model.Editable;
 
-/**
- * Главное окно справочника контактов (Лаб. 1, вариант 4).
- * Таблица + кнопки «Загрузить CSV», «Сохранить CSV», «Добавить», «Изменить».
- * Кнопка «Изменить» активна только для Editable-типов, то есть только для корпоративных
- * контактов: базовый и аварийный появляются исключительно при загрузке из файла.
- */
+// Главное окно справочника контактов (Лаб. 1, вариант 4).
+// Таблица + кнопки «Загрузить CSV», «Сохранить CSV», «Добавить», «Изменить».
+// Кнопка «Изменить» активна только для Editable-типов, то есть только для корпоративных
+// контактов: базовый и аварийный появляются исключительно при загрузке из файла.
 public class ContactApp extends Application {
 
     private static final String CSV_EXTENSION = ".csv";
 
+    // Хранилище лаб. 1. В лаб. 2 готовый список запрещён (instruction.md:664) —
+    // здесь появится собственное дерево по имени.
     private final ObservableList<Contact> contacts = FXCollections.observableArrayList();
     private TableView<Contact> table;
     private Button editButton;
@@ -69,6 +70,7 @@ public class ContactApp extends Application {
         saveButton.setOnAction(e -> onSave(stage));
         addButton.setOnAction(e -> onAdd());
         editButton.setOnAction(e -> onEdit());
+        // Механизм прямо из условия задачи: «Изменить» только для Editable.
         table.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldSel, newSel) -> editButton.setDisable(!(newSel instanceof Editable)));
 
@@ -84,6 +86,8 @@ public class ContactApp extends Application {
     private static TableColumn<Contact, String> typeColumn() {
         TableColumn<Contact, String> col = new TableColumn<>("Тип");
         col.setPrefWidth(110);
+        // Тип получается вызовом метода, а не чтением свойства, поэтому PropertyValueFactory
+        // не подходит — но колонке всё равно нужна наблюдаемая обёртка.
         col.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().type().tag()));
         return col;
     }
@@ -116,6 +120,9 @@ public class ContactApp extends Application {
             if (result.hasErrors()) {
                 showSkippedDialog(result);
             }
+        } catch (CsvLoadException ex) {
+            // Ловится раньше IOException — иначе до сюда не дойдёт: это подтип.
+            showError("Не удалось загрузить: " + ex.getCode(), ex.getMessage());
         } catch (IOException ex) {
             showError("Ошибка загрузки", ex.getMessage());
         }
@@ -128,6 +135,8 @@ public class ContactApp extends Application {
         }
         Path path = file.toPath();
         if (!path.getFileName().toString().toLowerCase().endsWith(CSV_EXTENSION)) {
+            // showSaveDialog уже создал файл, поэтому переименовываем его, а не пишем
+            // в соседний: иначе остался бы пустой файл без расширения.
             Path renamed = path.resolveSibling(path.getFileName() + CSV_EXTENSION);
             try {
                 Files.move(path, renamed, StandardCopyOption.REPLACE_EXISTING);

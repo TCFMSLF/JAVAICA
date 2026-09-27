@@ -4,11 +4,11 @@ import java.util.List;
 
 import ru.contacts.model.Contact;
 
-/**
- * Результат загрузки CSV: корректные контакты и список ошибок по битым строкам.
- * Битые строки пропускаются, но каждая фиксируется с номером и кодом.
- */
+// Итог загрузки CSV: корректные контакты и список ошибок по битым строкам.
+// Исключения здесь не бывает — оно живёт в CsvLoadException.
 public class CsvLoadResult {
+    // List.copyOf, а не unmodifiableList: нужна копия, иначе вызывающий продолжит
+    // менять списки, которые мы отдали.
     private final List<Contact> contacts;
     private final List<CsvRowError> errors;
 
