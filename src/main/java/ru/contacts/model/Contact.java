@@ -7,7 +7,9 @@ import java.util.List;
  * Основная сущность варианта 4: контакт справочника.
  */
 
-public class Contact implements Editable {
+public class Contact implements Editable, java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
     protected String name;
     protected String phone;
     protected String email;

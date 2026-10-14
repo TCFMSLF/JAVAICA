@@ -7,6 +7,8 @@ import java.util.List;
  * Корпоративный контакт — редактируемый тип с новыми полями.
  */
 public class CorporateContact extends Contact implements Editable {
+    private static final long serialVersionUID = 1L;
+
     private String position;
     private String internalNumber;
 

@@ -32,6 +32,10 @@ import javafx.stage.Stage;
 import ru.contacts.io.CsvLoadResult;
 import ru.contacts.io.CsvLoader;
 import ru.contacts.io.CsvRowError;
+import ru.contacts.io.ser.BinContactSerializer;
+import ru.contacts.io.ser.ContactData;
+import ru.contacts.io.ser.JsonContactSerializer;
+import ru.contacts.io.ser.Serializer;
 import ru.contacts.model.Contact;
 import ru.contacts.model.CorporateContact;
 import ru.contacts.model.Editable;
@@ -41,7 +45,7 @@ import ru.contacts.store.TrieBenchmark;
 import ru.contacts.store.TrieStore;
 
 /**
- * Главное окно (Лаб. 2, вариант 4).
+ * Главное окно (Лаб. 3, вариант 4).
  * Основное хранилище — собственная Trie ({@link TrieStore}, generics),
  * {@link ObservableList} — только витрина для TableView (синхронизируется
  * после каждой операции). Визуализация — {@link TrieCanvas} с полной
@@ -100,6 +104,17 @@ public class ContactApp extends Application {
 
         HBox crud = new HBox(8, loadButton, saveButton, addButton, editButton, deleteButton);
 
+        // лаб. 3: экспорт/импорт через общий интерфейс Serializer
+        Button expJsonButton = new Button("Экспорт JSON");
+        Button impJsonButton = new Button("Импорт JSON (фон)");
+        Button expBinButton = new Button("Экспорт BIN");
+        Button impBinButton = new Button("Импорт BIN (фон)");
+        expJsonButton.setOnAction(e -> onExportSer(stage, new JsonContactSerializer(), "json"));
+        impJsonButton.setOnAction(e -> onImportSer(stage, new JsonContactSerializer(), "json"));
+        expBinButton.setOnAction(e -> onExportSer(stage, new BinContactSerializer(), "bin"));
+        impBinButton.setOnAction(e -> onImportSer(stage, new BinContactSerializer(), "bin"));
+        HBox serBox = new HBox(8, expJsonButton, impJsonButton, expBinButton, impBinButton);
+
         // точный поиск
         TextField searchField = new TextField();
         searchField.setPromptText("Точное имя");
@@ -148,10 +163,10 @@ public class ContactApp extends Application {
         outArea.setPromptText("Демо гонки...");
         HBox raceBox = new HBox(8, raceButton);
 
-        VBox root = new VBox(8, table, crud, searchBox, prefixBox, genBox, canvasBox, raceBox, outArea);
+        VBox root = new VBox(8, table, crud, serBox, searchBox, prefixBox, genBox, canvasBox, raceBox, outArea);
         root.setPadding(new Insets(12));
 
-        stage.setTitle("Справочник контактов — Trie (Лаб. 2, макс.)");
+        stage.setTitle("Справочник контактов — Trie (Лаб. 3, макс.)");
         stage.setScene(new Scene(root, 920, 830));
         stage.show();
         refresh();
@@ -361,6 +376,58 @@ public class ContactApp extends Application {
         }
     }
 
+    // ---- лаб. 3: сериализация через общий интерфейс Serializer ----
+
+    private void onExportSer(Stage stage, Serializer serializer, String ext) {
+        File file = serChooser("Экспорт данных (" + serializer.format() + ")", ext)
+                .showSaveDialog(stage);
+        if (file == null) {
+            return;
+        }
+        java.nio.file.Path path = file.toPath();
+        if (!path.toString().toLowerCase().endsWith("." + ext)) {
+            path = path.resolveSibling(path.getFileName() + "." + ext);
+        }
+        try {
+            ContactData data = ContactData.fromModels(
+                    new ArrayList<>(Arrays.asList(store.snapshot())));
+            serializer.save(data, path);
+        } catch (IOException ex) {
+            showError("Ошибка экспорта (" + serializer.format() + ")", ex.getMessage());
+        }
+    }
+
+    private void onImportSer(Stage stage, Serializer serializer, String ext) {
+        File file = serChooser("Импорт данных (" + serializer.format() + ")", ext)
+                .showOpenDialog(stage);
+        if (file == null) {
+            return;
+        }
+        java.nio.file.Path path = file.toPath();
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                ContactData data = serializer.load(path);
+                List<Contact> list = data.toModels();
+                // Импорт — замена: чистим хранилище и кладём всё прочитанное.
+                store.clear();
+                int total = list.size();
+                for (int i = 0; i < total; i++) {
+                    if (isCancelled()) {
+                        break;
+                    }
+                    store.add(list.get(i));
+                    if (i % 200 == 0 || i + 1 == total) {
+                        updateProgress(i + 1, Math.max(1, total));
+                    }
+                }
+                Platform.runLater(ContactApp.this::refresh);
+                return null;
+            }
+        };
+        runTask(task, "Импорт " + serializer.format() + "...");
+    }
+
     private static TableColumn<Contact, String> typeColumn() {
         TableColumn<Contact, String> col = new TableColumn<>("Тип");
         col.setPrefWidth(100);
@@ -385,6 +452,14 @@ public class ContactApp extends Application {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(title);
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
+        return chooser;
+    }
+
+    private FileChooser serChooser(String title, String ext) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(title);
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                ext.toUpperCase(), "*." + ext));
         return chooser;
     }
 

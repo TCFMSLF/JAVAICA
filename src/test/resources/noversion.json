@@ -1,0 +1,13 @@
+{
+  "contacts" : [
+    {
+      "type" : "CONTACT",
+      "name" : "Без Версии",
+      "phone" : "+7-900-111-22-33",
+      "email" : "noversion@example.com",
+      "organization" : "Орг1",
+      "position" : "",
+      "internalNumber" : ""
+    }
+  ]
+}

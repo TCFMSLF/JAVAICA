@@ -1,0 +1,14 @@
+{
+  "schema_version" : 1,
+  "contacts" : [
+    {
+      "type" : "ROBOT",
+      "name" : "Неизвестный Тип",
+      "phone" : "+7-900-111-22-33",
+      "email" : "robot@example.com",
+      "organization" : "Орг1",
+      "position" : "",
+      "internalNumber" : ""
+    }
+  ]
+}

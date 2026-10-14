@@ -1,0 +1,32 @@
+{
+  "schema_version" : 1,
+  "contacts" : [
+    {
+      "type" : "CONTACT",
+      "name" : "Иван Петров",
+      "phone" : "+7-900-111-22-33",
+      "email" : "ivan@example.com",
+      "organization" : "Орг1",
+      "position" : "",
+      "internalNumber" : ""
+    },
+    {
+      "type" : "EMERGENCY",
+      "name" : "Аварийный Контакт",
+      "phone" : "+7-900-000-00-01",
+      "email" : "sos@example.com",
+      "organization" : "МЧС",
+      "position" : "",
+      "internalNumber" : ""
+    },
+    {
+      "type" : "CORPORATE",
+      "name" : "Мария Сидорова",
+      "phone" : "+7-900-222-33-44",
+      "email" : "maria@example.com",
+      "organization" : "Орг2",
+      "position" : "Менеджер",
+      "internalNumber" : "1234"
+    }
+  ]
+}
