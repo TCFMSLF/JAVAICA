@@ -18,9 +18,9 @@ import ru.contacts.model.EmergencyContact;
 
 /**
  * Диалог добавления/редактирования контакта.
- * В режиме добавления тип выбирается; CONTACT и EMERGENCY заблокированы
- * для создания (появляются только из файла) — создать можно только
- * редактируемый CorporateContact. В режиме редактирования тип фиксирован.
+ * В режиме добавления доступен только редактируемый CorporateContact;
+ * CONTACT и EMERGENCY появляются только из файла.
+ * В режиме редактирования тип фиксирован.
  * Сохранение блокируется, пока {@link Editable#validate()} возвращает ошибки.
  */
 public class ContactDialog extends Dialog<Contact> {
@@ -44,12 +44,14 @@ public class ContactDialog extends Dialog<Contact> {
         ButtonType saveType = new ButtonType("Сохранить", ButtonBar.ButtonData.OK_DONE);
         getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
-        typeBox.getItems().addAll("CONTACT", "EMERGENCY", "CORPORATE");
         if (editMode) {
+            typeBox.getItems().addAll("CONTACT", "EMERGENCY", "CORPORATE");
             typeBox.setValue(typeOf(existing));
             typeBox.setDisable(true);
             fillFields(existing);
         } else {
+            // «Добавить» создаёт только редактируемые типы.
+            typeBox.getItems().add("CORPORATE");
             typeBox.setValue("CORPORATE");
         }
 
@@ -76,17 +78,15 @@ public class ContactDialog extends Dialog<Contact> {
 
         Runnable refresh = () -> {
             boolean corporate = "CORPORATE".equals(typeBox.getValue());
-            boolean cont = "CONTACT".equals(typeBox.getValue());
+            boolean allowed = editMode ? existing instanceof Editable : corporate;
             positionField.setDisable(!corporate);
             internalField.setDisable(!corporate);
-            if (!editMode && !(corporate || cont)){
-                hintLabel.setText("Тип " + typeBox.getValue()
-                        + " появляется только из файла. Выберите CORPORATE.");
+            if (!allowed) {
+                hintLabel.setText("Этот тип доступен только для чтения и не может быть сохранён.");
             } else {
                 hintLabel.setText("");
             }
-            getDialogPane().lookupButton(saveType)
-                    .setDisable(!editMode && !(corporate || cont));
+            getDialogPane().lookupButton(saveType).setDisable(!allowed);
         };
         typeBox.setOnAction(e -> refresh.run());
         refresh.run();

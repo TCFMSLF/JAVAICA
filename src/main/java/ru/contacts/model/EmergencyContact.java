@@ -2,7 +2,7 @@ package ru.contacts.model;
 
 /**
  * Аварийный контакт — read-only тип.
- * НЕ реализует Editable, сеттеров нет: редактирование запрещено.
+ * Не реализует Editable; сеттеры переопределены и запрещают изменение.
  * Объекты этого типа появляются только при загрузке из файла.
  */
 public class EmergencyContact extends Contact {

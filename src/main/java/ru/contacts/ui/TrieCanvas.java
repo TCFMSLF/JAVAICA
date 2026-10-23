@@ -24,6 +24,8 @@ public class TrieCanvas extends Canvas {
     private static final double R = 12;
     private static final double V_GAP = 48;
     private static final double TOP = 26;
+    private static final double MIN_HEIGHT = 300;
+    private static final double BOTTOM_PADDING = 40;
 
     public TrieCanvas(double width, double height) {
         super(width, height);
@@ -32,14 +34,14 @@ public class TrieCanvas extends Canvas {
     /** Полная перерисовка панели. */
     public void draw(TrieNode<?> root, TrieNode<?>[] highlight) {
         GraphicsContext g = getGraphicsContext2D();
-        double w = getWidth();
-        double h = getHeight();
-        g.clearRect(0, 0, w, h);
-        g.setFill(Color.WHITE);
-        g.fillRect(0, 0, w, h);
-        g.setFont(Font.font(11));
 
         if (root == null || (root.childCount == 0 && !root.terminal)) {
+            if (Math.abs(getHeight() - MIN_HEIGHT) > 0.5) {
+                setHeight(MIN_HEIGHT);
+            }
+            g.clearRect(0, 0, getWidth(), getHeight());
+            g.setFill(Color.WHITE);
+            g.fillRect(0, 0, getWidth(), getHeight());
             g.setFill(Color.GRAY);
             g.fillText("Trie пусто — загрузите CSV или сгенерируйте данные", 12, 24);
             return;
@@ -70,6 +72,38 @@ public class TrieCanvas extends Canvas {
                 d.add(depth + 1);
             }
         }
+
+        // Путь последней операции должен быть виден даже при обрезке BFS.
+        if (highlight != null) {
+            for (int depth = 0; depth < highlight.length; depth++) {
+                TrieNode<?> n = highlight[depth];
+                if (n == null) {
+                    continue;
+                }
+                while (levels.size() <= depth) {
+                    levels.add(new ArrayList<>());
+                }
+                if (!parent.containsKey(n)) {
+                    levels.get(depth).add(n);
+                    order.add(n);
+                    parent.put(n, depth == 0 ? null : highlight[depth - 1]);
+                }
+            }
+        }
+
+        // Высота зависит от числа уровней, иначе глубокие узлы обрезаются.
+        double requiredHeight = Math.max(MIN_HEIGHT,
+                TOP + (levels.size() - 1) * V_GAP + BOTTOM_PADDING);
+        if (Math.abs(getHeight() - requiredHeight) > 0.5) {
+            setHeight(requiredHeight);
+        }
+
+        double w = getWidth();
+        double h = getHeight();
+        g.clearRect(0, 0, w, h);
+        g.setFill(Color.WHITE);
+        g.fillRect(0, 0, w, h);
+        g.setFont(Font.font(11));
 
         Map<TrieNode<?>, double[]> pos = new HashMap<>();
         for (int depth = 0; depth < levels.size(); depth++) {

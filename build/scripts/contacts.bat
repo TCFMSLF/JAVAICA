@@ -70,7 +70,7 @@ echo location of your Java installation. 1>&2
 :execute
 @rem Setup the command line
 
-set CLASSPATH=%APP_HOME%\lib\contacts.jar;%APP_HOME%\lib\javafx-controls-21.0.12-win.jar;%APP_HOME%\lib\javafx-graphics-21.0.12-win.jar;%APP_HOME%\lib\javafx-base-21.0.12-win.jar
+set CLASSPATH=%APP_HOME%\lib\contacts.jar;%APP_HOME%\lib\javafx-controls-21.0.12-linux.jar;%APP_HOME%\lib\javafx-graphics-21.0.12-linux.jar;%APP_HOME%\lib\javafx-base-21.0.12-linux.jar
 
 
 @rem Execute contacts

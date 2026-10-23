@@ -20,12 +20,14 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -134,10 +136,16 @@ public class ContactApp extends Application {
         });
         HBox genBox = new HBox(8, new Label("Генерация N:"), genField, genButton, cancelButton, progress, statusLabel);
 
-        // визуализация
+        // визуализация: высота Canvas растёт по числу уровней, поэтому нужен ScrollPane
         canvas = new TrieCanvas(880, 300);
         canvas.widthProperty().addListener((o, a, b) -> refresh());
-        HBox canvasBox = new HBox(canvas);
+        ScrollPane canvasScroll = new ScrollPane(canvas);
+        canvasScroll.setPrefViewportHeight(300);
+        canvasScroll.setMinHeight(300);
+        canvasScroll.setMaxWidth(Double.MAX_VALUE);
+        canvasScroll.setPannable(true);
+        HBox.setHgrow(canvasScroll, Priority.ALWAYS);
+        HBox canvasBox = new HBox(canvasScroll);
 
         // демо гонки
         Button raceButton = new Button("Демо гонки");
@@ -295,12 +303,14 @@ public class ContactApp extends Application {
                 return TrieBenchmark.raceDemo(8, 2000);
             }
         };
-        task.setOnSucceeded(e -> outArea.setText(task.getValue()));
-        task.setOnFailed(e -> showError("Демо гонки", String.valueOf(task.getException())));
-        runTask(task, "Демо гонки...");
+        runTask(task, "Демо гонки...", () -> outArea.setText(task.getValue()));
     }
 
     private void runTask(Task<?> task, String status) {
+        runTask(task, status, null);
+    }
+
+    private void runTask(Task<?> task, String status, Runnable onSuccess) {
         if (currentTask != null && currentTask.isRunning()) {
             showError("Фоновая задача", "Дождитесь завершения или нажмите «Отмена»");
             return;
@@ -319,6 +329,9 @@ public class ContactApp extends Application {
             statusLabel.textProperty().unbind();
             progress.setProgress(1);
             refresh();
+            if (onSuccess != null) {
+                onSuccess.run();
+            }
         });
         task.setOnFailed(e -> {
             progress.progressProperty().unbind();

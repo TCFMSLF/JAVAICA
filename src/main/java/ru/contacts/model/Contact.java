@@ -7,7 +7,7 @@ import java.util.List;
  * Основная сущность варианта 4: контакт справочника.
  */
 
-public class Contact implements Editable {
+public class Contact {
     protected String name;
     protected String phone;
     protected String email;
@@ -62,7 +62,6 @@ public class Contact implements Editable {
                 + '}';
     }
 
-    @Override
     public List<String> validate() {
         List<String> errors = new ArrayList<>();
         if (name == null || name.isBlank()) {
