@@ -1,0 +1,28 @@
+{
+  "schemaVersion" : 1,
+  "contacts" : [ {
+    "type" : "CONTACT",
+    "name" : "Иван Петров",
+    "phone" : "+7-900-111-22-33",
+    "email" : "ivan@example.com",
+    "organization" : "ООО Ромашка",
+    "position" : null,
+    "internalNumber" : null
+  }, {
+    "type" : "EMERGENCY",
+    "name" : "Мама",
+    "phone" : "+7-900-000-00-01",
+    "email" : "mama@example.com",
+    "organization" : "",
+    "position" : null,
+    "internalNumber" : null
+  }, {
+    "type" : "CORPORATE",
+    "name" : "Анна Сидорова",
+    "phone" : "+7-900-222-33-44",
+    "email" : "anna@corp.ru",
+    "organization" : "ООО Ромашка",
+    "position" : "Менеджер",
+    "internalNumber" : "1234"
+  } ]
+}

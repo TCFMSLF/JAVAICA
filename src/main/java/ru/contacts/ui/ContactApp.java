@@ -2,14 +2,14 @@ package ru.contacts.ui;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -18,6 +18,7 @@ import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
@@ -34,30 +35,39 @@ import javafx.stage.Stage;
 import ru.contacts.io.CsvLoadResult;
 import ru.contacts.io.CsvLoader;
 import ru.contacts.io.CsvRowError;
+import ru.contacts.io.serial.BinaryContactSerializer;
+import ru.contacts.io.serial.JsonContactSerializer;
+import ru.contacts.io.serial.SerializationBenchmark;
+import ru.contacts.io.serial.Serializer;
 import ru.contacts.model.Contact;
 import ru.contacts.model.CorporateContact;
 import ru.contacts.model.Editable;
+import ru.contacts.model.EmergencyContact;
 import ru.contacts.store.ContactGenerator;
 import ru.contacts.store.ContactStores;
 import ru.contacts.store.TrieBenchmark;
 import ru.contacts.store.TrieStore;
 
 /**
- * Главное окно (Лаб. 2, вариант 4).
+ * Главное окно (Лаб. 2–3, вариант 4).
  * Основное хранилище — собственная Trie ({@link TrieStore}, generics),
  * {@link ObservableList} — только витрина для TableView (синхронизируется
  * после каждой операции). Визуализация — {@link TrieCanvas} с полной
- * перерисовкой и подсветкой посещённых узлов.
+ * перерисовкой и подсветкой посещённых узлов. Лаб. 3 добавляет JSON/BIN
+ * сериализацию снимка контактов и замеры форматов.
  */
 public class ContactApp extends Application {
 
     /** Источник правды. Витрина таблицы ниже — лишь его снимок. */
     private final TrieStore<Contact> store = ContactStores.newStore();
     private final ObservableList<Contact> mirror = FXCollections.observableArrayList();
+    private final Serializer<Contact[]> jsonSerializer = new JsonContactSerializer();
+    private final Serializer<Contact[]> binarySerializer = new BinaryContactSerializer();
 
     private TableView<Contact> table;
     private Button editButton;
     private Button deleteButton;
+    private ComboBox<String> formatBox;
     private TrieCanvas canvas;
     private ProgressBar progress;
     private Label statusLabel;
@@ -79,7 +89,7 @@ public class ContactApp extends Application {
                 column("E-mail", "email", 160),
                 column("Организация", "organization", 130),
                 column("Должность", "position", 110),
-                column("Внутр. номер", "internalNumber", 90));
+                column("Внутр. номер", "internalNumber", 110));
 
         Button loadButton = new Button("Загрузить CSV (фон)");
         Button saveButton = new Button("Сохранить CSV");
@@ -101,6 +111,19 @@ public class ContactApp extends Application {
                 });
 
         HBox crud = new HBox(8, loadButton, saveButton, addButton, editButton, deleteButton);
+
+        // Лаб. 3: импорт/экспорт снимка контактов и сравнение форматов
+        formatBox = new ComboBox<>();
+        formatBox.getItems().addAll("JSON", "BIN");
+        formatBox.setValue("JSON");
+        Button exportButton = new Button("Экспорт...");
+        Button importButton = new Button("Импорт...");
+        Button benchmarkButton = new Button("Замеры JSON/BIN");
+        exportButton.setOnAction(e -> onExport(stage));
+        importButton.setOnAction(e -> onImport(stage));
+        benchmarkButton.setOnAction(e -> onSerializationBenchmark());
+        HBox serializationBox = new HBox(8, new Label("Сериализация:"), formatBox,
+                exportButton, importButton, benchmarkButton);
 
         // точный поиск
         TextField searchField = new TextField();
@@ -138,7 +161,7 @@ public class ContactApp extends Application {
 
         // визуализация: высота Canvas растёт по числу уровней, поэтому нужен ScrollPane
         canvas = new TrieCanvas(880, 300);
-        canvas.widthProperty().addListener((o, a, b) -> refresh());
+        canvas.widthProperty().addListener((o, a, b) -> refreshCanvas());
         ScrollPane canvasScroll = new ScrollPane(canvas);
         canvasScroll.setPrefViewportHeight(300);
         canvasScroll.setMinHeight(300);
@@ -153,16 +176,17 @@ public class ContactApp extends Application {
         outArea = new TextArea();
         outArea.setPrefRowCount(4);
         outArea.setEditable(false);
-        outArea.setPromptText("Демо гонки...");
+        outArea.setPromptText("Демо гонки или замеры JSON/BIN...");
         HBox raceBox = new HBox(8, raceButton);
 
-        VBox root = new VBox(8, table, crud, searchBox, prefixBox, genBox, canvasBox, raceBox, outArea);
+        VBox root = new VBox(8, table, crud, serializationBox, searchBox, prefixBox,
+                genBox, canvasBox, raceBox, outArea);
         root.setPadding(new Insets(12));
 
-        stage.setTitle("Справочник контактов — Trie (Лаб. 2, макс.)");
-        stage.setScene(new Scene(root, 920, 830));
+        stage.setTitle("Справочник контактов — Trie (Лаб. 3, вариант 4)");
+        stage.setScene(new Scene(root, 960, 920));
         stage.show();
-        refresh();
+        refreshAll();
     }
 
     // ---- CRUD поверх Trie ----
@@ -171,7 +195,7 @@ public class ContactApp extends Application {
         Optional<Contact> created = new ContactDialog(null).showAndWait();
         created.ifPresent(c -> {
             store.add(c);
-            refresh();
+            refreshAll();
         });
     }
 
@@ -186,7 +210,7 @@ public class ContactApp extends Application {
                 store.removeByKey(selected.getName());
             }
             store.add(c);
-            refresh();
+            refreshAll();
         });
     }
 
@@ -196,13 +220,13 @@ public class ContactApp extends Application {
             return;
         }
         store.removeByKey(selected.getName());
-        refresh();
+        refreshAll();
     }
 
     private void onFind(String key) {
         if (key == null || key.isBlank()) {
             searchLabel.setText("Поиск: пустой запрос");
-            refresh();
+            refreshCanvas();
             return;
         }
         Contact found = store.findByKey(key);
@@ -212,7 +236,7 @@ public class ContactApp extends Application {
         } else {
             searchLabel.setText("Поиск: «" + key + "» не найден");
         }
-        refresh(); // перерисовка с подсветкой пройденного пути
+        refreshCanvas(); // перерисовка с подсветкой пройденного пути
     }
 
     private void onAutocomplete(String prefix) {
@@ -224,7 +248,7 @@ public class ContactApp extends Application {
         String first = Arrays.stream(hits).limit(5).map(Contact::getName)
                 .collect(Collectors.joining(", "));
         prefixLabel.setText("Совпадений: " + count + (first.isEmpty() ? "" : " | напр.: " + first));
-        refresh();
+        refreshCanvas();
     }
 
     // ---- фоновая загрузка CSV через Task с прогрессом ----
@@ -234,9 +258,9 @@ public class ContactApp extends Application {
         if (file == null) {
             return;
         }
-        Task<Void> task = new Task<>() {
+        Task<CsvLoadResult> task = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected CsvLoadResult call() throws Exception {
                 CsvLoadResult result = CsvLoader.load(file.toPath());
                 List<Contact> list = result.getContacts();
                 int total = list.size();
@@ -249,16 +273,15 @@ public class ContactApp extends Application {
                         updateProgress(i + 1, total);
                     }
                 }
-                Platform.runLater(() -> {
-                    refresh();
-                    if (result.hasErrors()) {
-                        showSkippedDialog(result);
-                    }
-                });
-                return null;
+                return result;
             }
         };
-        runTask(task, "Загрузка CSV...");
+        runTask(task, "Загрузка CSV...", result -> {
+            refreshAll();
+            if (result.hasErrors()) {
+                showSkippedDialog(result);
+            }
+        });
     }
 
     // ---- фоновая генерация с отменой ----
@@ -287,11 +310,10 @@ public class ContactApp extends Application {
                         updateProgress(i + 1, n);
                     }
                 }
-                Platform.runLater(ContactApp.this::refresh);
                 return null;
             }
         };
-        runTask(task, "Генерация " + n + "...");
+        runTask(task, "Генерация " + n + "...", ignored -> refreshAll());
     }
 
     // ---- гонка в фоне ----
@@ -303,14 +325,104 @@ public class ContactApp extends Application {
                 return TrieBenchmark.raceDemo(8, 2000);
             }
         };
-        runTask(task, "Демо гонки...", () -> outArea.setText(task.getValue()));
+        runTask(task, "Демо гонки...", report -> outArea.setText(report));
     }
 
-    private void runTask(Task<?> task, String status) {
-        runTask(task, status, null);
+    // ---- Лаб. 3: экспорт/импорт и замеры форматов ----
+
+    private void onExport(Stage stage) {
+        Serializer<Contact[]> serializer = selectedSerializer();
+        File file = serializationChooser("Экспорт " + formatLabel(serializer), serializer.format())
+                .showSaveDialog(stage);
+        if (file == null) {
+            return;
+        }
+        Path path = withExtension(file.toPath(), serializer.format());
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                serializer.save(store.snapshot(), path);
+                return null;
+            }
+        };
+        runTask(task, "Экспорт " + formatLabel(serializer) + "...", ignored ->
+                statusLabel.setText("Экспортировано " + store.size() + " контактов: "
+                        + path.getFileName()));
     }
 
-    private void runTask(Task<?> task, String status, Runnable onSuccess) {
+    private void onImport(Stage stage) {
+        Serializer<Contact[]> serializer = selectedSerializer();
+        File file = serializationChooser("Импорт " + formatLabel(serializer), serializer.format())
+                .showOpenDialog(stage);
+        if (file == null) {
+            return;
+        }
+        Path path = file.toPath();
+        Task<Contact[]> task = new Task<>() {
+            @Override
+            protected Contact[] call() throws Exception {
+                return serializer.load(path);
+            }
+        };
+        runTask(task, "Импорт " + formatLabel(serializer) + "...", contacts -> {
+            store.clear();
+            for (Contact contact : contacts) {
+                store.add(contact);
+            }
+            refreshAll();
+            searchLabel.setText("Поиск: —");
+            prefixLabel.setText("Совпадений: —");
+            statusLabel.setText("Импортировано " + contacts.length + " контактов (Trie: "
+                    + store.size() + ")");
+        });
+    }
+
+    private void onSerializationBenchmark() {
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                return SerializationBenchmark.compare(10_000, 5);
+            }
+        };
+        runTask(task, "Замеры JSON/BIN...", report -> outArea.setText(report));
+    }
+
+    private Serializer<Contact[]> selectedSerializer() {
+        return "BIN".equals(formatBox.getValue()) ? binarySerializer : jsonSerializer;
+    }
+
+    private static String formatLabel(Serializer<?> serializer) {
+        return formatLabel(serializer.format());
+    }
+
+    private static String formatLabel(String format) {
+        return "json".equals(format) ? "JSON" : "BIN";
+    }
+
+    private FileChooser serializationChooser(String title, String format) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(title);
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                formatLabel(format), "*." + format));
+        return chooser;
+    }
+
+    private static Path withExtension(Path path, String format) {
+        String fileName = path.getFileName().toString();
+        String suffix = "." + format;
+        if (fileName.toLowerCase(java.util.Locale.ROOT).endsWith(suffix)) {
+            return path;
+        }
+        return path.resolveSibling(fileName + suffix);
+    }
+
+    // ---- общее ----
+
+    /**
+     * Единая точка запуска фоновых задач: блокирует второй Task,
+     * снимает привязки прогресса/статуса и передаёт результат в FX-поток.
+     */
+    private <T> void runTask(Task<T> task, String status, Consumer<T> onSuccess) {
         if (currentTask != null && currentTask.isRunning()) {
             showError("Фоновая задача", "Дождитесь завершения или нажмите «Отмена»");
             return;
@@ -319,37 +431,49 @@ public class ContactApp extends Application {
         progress.progressProperty().bind(task.progressProperty());
         statusLabel.textProperty().bind(task.messageProperty());
         task.setOnCancelled(e -> {
-            progress.progressProperty().unbind();
-            statusLabel.textProperty().unbind();
+            resetTaskUi();
             progress.setProgress(0);
-            refresh();
+            refreshAll();
         });
         task.setOnSucceeded(e -> {
-            progress.progressProperty().unbind();
-            statusLabel.textProperty().unbind();
+            resetTaskUi();
             progress.setProgress(1);
-            refresh();
+            statusLabel.setText("Готово");
             if (onSuccess != null) {
-                onSuccess.run();
+                onSuccess.accept(task.getValue());
             }
         });
         task.setOnFailed(e -> {
-            progress.progressProperty().unbind();
-            statusLabel.textProperty().unbind();
-            showError("Ошибка фоновой задачи", String.valueOf(task.getException()));
-            refresh();
+            resetTaskUi();
+            progress.setProgress(0);
+            Throwable error = task.getException();
+            String message = error == null || error.getMessage() == null
+                    ? String.valueOf(error) : error.getMessage();
+            showError("Ошибка фоновой задачи", message);
+            refreshAll();
         });
         statusLabel.textProperty().unbind();
         statusLabel.setText(status);
-        new Thread(task, "lab2-task").start();
+        new Thread(task, "lab3-task").start();
     }
 
-    // ---- общее ----
+    private void resetTaskUi() {
+        currentTask = null;
+        progress.progressProperty().unbind();
+        statusLabel.textProperty().unbind();
+    }
 
     /** Синхронизировать витрину таблицы и перерисовать Trie. */
-    private void refresh() {
-        Contact[] snap = store.snapshot();
-        mirror.setAll(new ArrayList<>(Arrays.asList(snap)));
+    private void refreshAll() {
+        refreshTable();
+        refreshCanvas();
+    }
+
+    private void refreshTable() {
+        mirror.setAll(Arrays.asList(store.snapshot()));
+    }
+
+    private void refreshCanvas() {
         if (canvas != null) {
             canvas.draw(store.rootForView(), store.lastPath());
         }
@@ -363,12 +487,12 @@ public class ContactApp extends Application {
         if (file == null) {
             return;
         }
-        java.nio.file.Path path = file.toPath();
-        if (!path.toString().toLowerCase().endsWith(".csv")) {
+        Path path = file.toPath();
+        if (!path.toString().toLowerCase(java.util.Locale.ROOT).endsWith(".csv")) {
             path = path.resolveSibling(path.getFileName() + ".csv");
         }
         try {
-            CsvLoader.save(new ArrayList<>(Arrays.asList(store.snapshot())), path);
+            CsvLoader.save(Arrays.asList(store.snapshot()), path);
         } catch (IOException ex) {
             showError("Ошибка сохранения", ex.getMessage());
         }
@@ -382,7 +506,10 @@ public class ContactApp extends Application {
             if (c instanceof CorporateContact) {
                 return new ReadOnlyStringWrapper("CORPORATE");
             }
-            return new ReadOnlyStringWrapper(c.getClass().getSimpleName().toUpperCase());
+            if (c instanceof EmergencyContact) {
+                return new ReadOnlyStringWrapper("EMERGENCY");
+            }
+            return new ReadOnlyStringWrapper("CONTACT");
         });
         return col;
     }

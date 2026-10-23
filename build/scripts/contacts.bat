@@ -70,7 +70,7 @@ echo location of your Java installation. 1>&2
 :execute
 @rem Setup the command line
 
-set CLASSPATH=%APP_HOME%\lib\contacts.jar;%APP_HOME%\lib\javafx-controls-21.0.12-linux.jar;%APP_HOME%\lib\javafx-graphics-21.0.12-linux.jar;%APP_HOME%\lib\javafx-base-21.0.12-linux.jar
+set CLASSPATH=%APP_HOME%\lib\contacts.jar;%APP_HOME%\lib\jackson-annotations-2.17.0.jar;%APP_HOME%\lib\jackson-core-2.17.0.jar;%APP_HOME%\lib\jackson-databind-2.17.0.jar;%APP_HOME%\lib\javafx-controls-21.0.12-linux.jar;%APP_HOME%\lib\byte-buddy-1.14.9.jar;%APP_HOME%\lib\javafx-graphics-21.0.12-linux.jar;%APP_HOME%\lib\javafx-base-21.0.12-linux.jar
 
 
 @rem Execute contacts

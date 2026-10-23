@@ -141,7 +141,20 @@ public class TrieStore<V> implements EntityStore<String, V> {
                 parent.removeChildAt(idx);
             }
         }
-        lastPath = pathCopy(path, key.length()); // подсветить предков
+        // подсветить только реально оставшихся предков: удалённые узлы
+        // не должны попадать в Canvas как «призрачный» путь
+        TrieNode<V>[] attached = newNodes(key.length() + 1);
+        attached[0] = root;
+        int attachedLength = 1;
+        TrieNode<V> cursor = root;
+        for (int i = 0; i < key.length(); i++) {
+            cursor = cursor.findChild(key.charAt(i));
+            if (cursor == null) {
+                break;
+            }
+            attached[attachedLength++] = cursor;
+        }
+        lastPath = pathCopy(attached, attachedLength);
         return true;
     }
 

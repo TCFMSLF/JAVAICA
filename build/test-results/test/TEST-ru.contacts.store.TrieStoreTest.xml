@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ru.contacts.store.TrieStoreTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T08:14:49.807Z" hostname="tcfm-911m" time="0.004">
+  <properties/>
+  <testcase name="addsFindsAndDeletesByKey()" classname="ru.contacts.store.TrieStoreTest" time="0.002"/>
+  <testcase name="removeKeepsHighlightOnlyOnAttachedAncestors()" classname="ru.contacts.store.TrieStoreTest" time="0.001"/>
+  <testcase name="autocompleteAndCountInSubtreeReturnMatchingContacts()" classname="ru.contacts.store.TrieStoreTest" time="0.0"/>
+  <testcase name="duplicateKeyOverwritesValueWithoutGrowingSize()" classname="ru.contacts.store.TrieStoreTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

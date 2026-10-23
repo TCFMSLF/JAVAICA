@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ru.contacts.io.serial.BinaryContactSerializerTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-23T08:14:49.688Z" hostname="tcfm-911m" time="0.013">
+  <properties/>
+  <testcase name="roundTripPreservesAllContactTypesAndFields()" classname="ru.contacts.io.serial.BinaryContactSerializerTest" time="0.007"/>
+  <testcase name="rejectsCorruptedBinaryFile()" classname="ru.contacts.io.serial.BinaryContactSerializerTest" time="0.002"/>
+  <testcase name="rejectsUnsupportedSchemaVersion()" classname="ru.contacts.io.serial.BinaryContactSerializerTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ru.contacts.io.serial.JsonContactSerializerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-23T08:14:49.702Z" hostname="tcfm-911m" time="0.104">
+  <properties/>
+  <testcase name="roundTripsEmptyContactArray()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.036"/>
+  <testcase name="rejectsInvalidContactData()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.004"/>
+  <testcase name="loadsPreparedJsonFile()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.001"/>
+  <testcase name="rejectsInvalidContactBeforeSaving()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.001"/>
+  <testcase name="roundTripPreservesAllContactTypesAndFields()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.003"/>
+  <testcase name="rejectsBrokenJsonFile()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.003"/>
+  <testcase name="rejectsUnsupportedSchemaVersion()" classname="ru.contacts.io.serial.JsonContactSerializerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
